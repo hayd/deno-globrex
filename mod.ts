@@ -1,4 +1,6 @@
-const isWin = process.platform === 'win32';
+import * as deno from "deno";
+
+const isWin = deno.platform.os === 'win';
 const SEP = isWin ? `\\\\+` : `\\/`;
 const SEP_ESC = isWin ? `\\\\` : `/`;
 const GLOBSTAR = `((?:[^/]*(?:/|$))*)`;
@@ -20,7 +22,7 @@ const WILDCARD_SEGMENT = `([^${SEP_ESC}]*)`;
 export function globrex(glob, {extended = false, globstar = false, strict = false, filepath = false, flags = ''} = {}) {
     let regex = '';
     let segment = '';
-    let path = { regex: '', segments: [] };
+    let path: { regex: string | RegExp, segments: Array<RegExp>, globstar?: RegExp } = { regex: '', segments: [] };
 
     // If we are doing extended matching, this boolean is true when we are inside
     // a group (eg {*.html,*.js}), and false otherwise.
@@ -30,8 +32,11 @@ export function globrex(glob, {extended = false, globstar = false, strict = fals
     // extglob stack. Keep track of scope
     const ext = [];
 
+    interface AddOptions { split?: boolean; last?: boolean; only?: string};
+
     // Helper function to build string and segments
-    function add(str, {split, last, only}={}) {
+    function add(str, options: AddOptions={split: false, last: false, only: ''}) {
+        const {split, last, only} = options;
         if (only !== 'path') regex += str;
         if (filepath && only !== 'regex') {
             path.regex += (str === '\\/' ? SEP : str);
@@ -255,12 +260,12 @@ export function globrex(glob, {extended = false, globstar = false, strict = fals
         if (filepath) path.regex = `^${path.regex}$`;
     }
 
-    const result = {regex: new RegExp(regex, flags)};
+    const result: { regex: RegExp, path?: { regex: string | RegExp, segments: Array<RegExp>, globstar?: RegExp } } = {regex: new RegExp(regex, flags)};
 
     // Push the last segment
     if (filepath) {
         path.segments.push(new RegExp(segment, flags));
-        path.regex = new RegExp(path.regex, flags);
+        path.regex = new RegExp(path.regex.toString(), flags);
         path.globstar = new RegExp(!flags.includes('g') ? `^${GLOBSTAR_SEGMENT}$` : GLOBSTAR_SEGMENT, flags);
         result.path = path;
     }
